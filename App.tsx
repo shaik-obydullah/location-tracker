@@ -1,45 +1,36 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- */
+import React, { useState } from 'react';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { LocationProvider } from './src/context/LocationContext';
+import HomeScreen from './src/screens/HomeScreen';
+import HistoryScreen from './src/screens/HistoryScreen';
+import SessionDetailScreen from './src/screens/SessionDetailScreen';
 
-import { NewAppScreen } from '@react-native/new-app-screen';
-import { StatusBar, StyleSheet, useColorScheme, View } from 'react-native';
-import {
-  SafeAreaProvider,
-  useSafeAreaInsets,
-} from 'react-native-safe-area-context';
-
-function App() {
-  const isDarkMode = useColorScheme() === 'dark';
+export default function App() {
+  const [screen, setScreen] = useState<'home' | 'history' | 'detail'>('home');
+  const [sessionId, setSessionId] = useState<number | null>(null);
 
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <AppContent />
+      <LocationProvider>
+        {screen === 'home' && (
+          <HomeScreen onShowHistory={() => setScreen('history')} />
+        )}
+        {screen === 'history' && (
+          <HistoryScreen
+            onBack={() => setScreen('home')}
+            onSelectSession={(id) => {
+              setSessionId(id);
+              setScreen('detail');
+            }}
+          />
+        )}
+        {screen === 'detail' && sessionId !== null && (
+          <SessionDetailScreen
+            sessionId={sessionId}
+            onBack={() => setScreen('history')}
+          />
+        )}
+      </LocationProvider>
     </SafeAreaProvider>
   );
 }
-
-function AppContent() {
-  const safeAreaInsets = useSafeAreaInsets();
-
-  return (
-    <View style={styles.container}>
-      <NewAppScreen
-        templateFileName="App.tsx"
-        safeAreaInsets={safeAreaInsets}
-      />
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-});
-
-export default App;

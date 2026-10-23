@@ -1,0 +1,16 @@
+FROM rnecommerce-android_env:latest
+
+# Install Node.js 22 (required by React Native 0.87) alongside the existing toolchain
+RUN cd /tmp \
+    && wget -q https://nodejs.org/dist/v22.14.0/node-v22.14.0-linux-x64.tar.gz -O node.tar.gz \
+    && tar -xzf node.tar.gz \
+    && cp -R node-v22.14.0-linux-x64/* /usr/local/ \
+    && rm -rf node-v22.14.0-linux-x64 node.tar.gz
+
+# Android platform 36 + build-tools 36.0.0 are already installed in the base image
+ENV ANDROID_HOME=/opt/android-sdk
+ENV ANDROID_SDK_ROOT=/opt/android-sdk
+
+WORKDIR /workspace
+
+CMD ["/bin/bash"]

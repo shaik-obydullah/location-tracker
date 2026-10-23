@@ -1,97 +1,162 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# Location Tracker
 
-# Getting Started
+A React Native app that records your location over time and lets you review each tracking session as a route on a map. Everything is stored locally on the device in SQLite — no account, no backend, no data leaves the phone.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+## Features
 
-## Step 1: Start Metro
+- **Start / stop tracking** from the home screen, with a live count of saved points.
+- **Live map** of the current trail using Leaflet + OpenStreetMap inside a `WebView`.
+- **Session history** — every start/stop creates a session showing its start time, end time, and point count.
+- **Session detail** — view a completed or in-progress track as a polyline with start and end markers.
+- **Background capture** via `react-native-background-fetch` (periodic) plus a foreground `watchPosition` subscription.
+- **Local-only storage** with `@op-engineering/op-sqlite`.
+- **Clear data** for locations only, or all sessions and locations.
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+## Tech stack
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+| Layer | Choice |
+| --- | --- |
+| Framework | React Native 0.87 (New Architecture, Hermes) |
+| Language | TypeScript |
+| Storage | `@op-engineering/op-sqlite` |
+| Location | `react-native-geolocation-service` |
+| Background tasks | `react-native-background-fetch` |
+| Maps | `react-native-webview` + Leaflet 1.9 + OpenStreetMap tiles |
+
+## Requirements
+
+- Node.js **>= 22.11.0**
+- npm (or yarn)
+- Android Studio + Android SDK (compile SDK 36) for Android
+- Xcode + CocoaPods for iOS
+- A physical device or emulator with location services enabled
+
+## Getting started
+
+Install dependencies:
 
 ```sh
-# Using npm
+npm install
+```
+
+Start Metro:
+
+```sh
 npm start
-
-# OR using Yarn
-yarn start
 ```
 
-## Step 2: Build and run your app
-
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
-
-### Android
+Run the app in another terminal:
 
 ```sh
-# Using npm
 npm run android
-
-# OR using Yarn
-yarn android
+# or
+npm run ios
 ```
 
-### iOS
-
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
-
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
+For iOS, install pods first (and again whenever native dependencies change):
 
 ```sh
 bundle install
-```
-
-Then, and every time you update your native dependencies, run:
-
-```sh
 bundle exec pod install
+npm run ios
 ```
 
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
+## Permissions
+
+On first tracking start the app requests location permission. Background recording also needs "Allow all the time" (Android) or "Always" (iOS) location access. On Android, if the user grants only foreground access, the app still records while open but not reliably in the background.
+
+The app does not require an API key: maps are rendered from OpenStreetMap tiles through Leaflet. The unused `GOOGLE_MAPS_API_KEY` placeholder in `android/gradle.properties` is left over from the template and can be ignored.
+
+## How tracking works
+
+- `startTracking()` creates a new session row, then subscribes to `watchPosition`
+  (`distanceFilter: 20 m`, `interval: 30 s`, high accuracy).
+- Each position is written to the `locations` table with the active `session_id`.
+- `react-native-background-fetch` is configured with a **15-minute minimum interval**
+  and `startOnBoot`/`stopOnTerminate` persistence. The OS decides exactly when it runs.
+- `stopTracking()` clears the watch and stamps `end_time` / `point_count` on the session.
+- The home map refreshes every 5 seconds while tracking is active.
+
+## Project structure
+
+```
+App.tsx                      Screen switching (home / history / detail)
+index.js                     App registration + headless background-fetch task
+src/
+  components/MapComponent.tsx     Live trail map (Leaflet in a WebView)
+  context/LocationContext.tsx     Tracking state + cached locations
+  database/locationDB.ts          SQLite schema and queries
+  screens/HomeScreen.tsx          Start/stop, clear, open history
+  screens/HistoryScreen.tsx       List of tracking sessions
+  screens/SessionDetailScreen.tsx Per-session track on a map
+  services/locationService.ts     Permissions, watchPosition, background fetch
+android/                     Native Android project
+ios/                         Native iOS project
+scripts/generate_icons.py    Generates launcher icons from the brand palette
+```
+
+## Database
+
+SQLite file: `locationtracker.sqlite`
+
+```sql
+CREATE TABLE locations (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  latitude   REAL NOT NULL,
+  longitude  REAL NOT NULL,
+  accuracy   REAL,
+  speed      REAL,
+  session_id INTEGER,
+  timestamp  DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE sessions (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  start_time  DATETIME DEFAULT CURRENT_TIMESTAMP,
+  end_time    DATETIME,
+  point_count INTEGER DEFAULT 0
+);
+```
+
+## Scripts
+
+| Command | Description |
+| --- | --- |
+| `npm start` | Start Metro |
+| `npm run android` | Build and run on Android |
+| `npm run ios` | Build and run on iOS |
+| `npm run lint` | ESLint |
+| `npm test` | Jest |
+
+## Release build (Android)
 
 ```sh
-# Using npm
-npm run ios
-
-# OR using Yarn
-yarn ios
+cd android
+./gradlew assembleRelease
 ```
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+The output APK is written to `android/app/build/outputs/apk/release/`. Note that the
+template signs release builds with the **debug keystore** — generate and configure a
+real keystore before distributing.
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+The repository also includes a prebuilt `LocationTracker-release.apk` at the project root.
 
-## Step 3: Modify your app
+### Dockerized Android build
 
-Now that you have successfully run the app, let's make changes!
+`docker-compose.yml` and `Dockerfile.android` provide a container with Node 22 and the
+Android toolchain. The image builds `FROM rnecommerce-android_env:latest`, which must
+exist locally or be replaced with your own base image.
 
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
+```sh
+docker compose run --rm android-builder
+```
 
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
+## Known limitations
 
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
-
-## Congratulations! :tada:
-
-You've successfully run and modified your React Native App. :partying_face:
-
-### Now what?
-
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+- The headless background task currently only acknowledges the task; positions captured
+  while the app process is dead are not saved. Background points are only persisted when
+  the foreground service/watch is alive.
+- Background fetch timing is controlled by the OS (minimum ~15 minutes on Android), so
+  intervals are approximate.
+- Maps require network access to fetch OpenStreetMap tiles.
+- Release builds are debug-signed and ProGuard is disabled.

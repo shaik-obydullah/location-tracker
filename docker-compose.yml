@@ -1,0 +1,23 @@
+services:
+  android-builder:
+    build:
+      context: .
+      dockerfile: Dockerfile.android
+    image: locationtracker-android-env:latest
+    container_name: rn-android-builder
+    working_dir: /workspace/LocationTracker
+    volumes:
+      - ..:/workspace
+      - gradle-cache:/root/.gradle
+    devices:
+      - "/dev/bus/usb"
+    environment:
+      - ANDROID_HOME=/opt/android-sdk
+      - ANDROID_SDK_ROOT=/opt/android-sdk
+    privileged: true
+    stdin_open: true
+    tty: true
+    command: bash
+
+volumes:
+  gradle-cache:

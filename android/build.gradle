@@ -1,11 +1,15 @@
 buildscript {
     ext {
-        buildToolsVersion = "37.0.0"
+        buildToolsVersion = "36.0.0"
         minSdkVersion = 24
-        compileSdkVersion = 37
+        compileSdkVersion = 36
         targetSdkVersion = 36
         ndkVersion = "27.1.12297006"
         kotlinVersion = "2.2.0"
+        // react-native-geolocation-service v5.3.1 must be compiled against play-services-location 21.x
+        // (SettingsClient/FusedLocationProviderClient became interfaces there). This name is read by
+        // react-native-geolocation-service's android/build.gradle via safeExtGet.
+        playServicesLocationVersion = "21.3.0"
     }
     repositories {
         google()
@@ -19,3 +23,8 @@ buildscript {
 }
 
 apply plugin: "com.facebook.react.rootproject"
+
+// Expose to subprojects: react-native-geolocation-service v5.3.1 must be compiled against
+// play-services-location 21.x (SettingsClient/FusedLocationProviderClient became interfaces there)
+// to match react-native-maps, which references the interface forms. It reads this via safeExtGet.
+ext.playServicesLocationVersion = "21.3.0"
